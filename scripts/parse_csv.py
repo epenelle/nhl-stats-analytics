@@ -2,6 +2,7 @@
 # Usage: python parse_csv.py <csv_file>
 import sys
 import csv
+import requests
 from dotenv import load_dotenv
 
 # class SkaterSeasonStats:
@@ -122,58 +123,71 @@ class SkaterSituationSeasonStats:
 def main():
     load_dotenv()
 
-    # Check if the user has provided a file name
-    if len(sys.argv) < 2:
-        print("Usage: python parse_csv.py <csv_file>")
-        return
-    
-    allSkaterStats = GetAllPlayerSituationStats()
-    allSkaterSeasonStats = SituationStatsToSeasonStats(allSkaterStats)
-    WriteStatsToCsvFile(allSkaterSeasonStats, sys.argv[2])
+    # read all lines from config.txt into a list
+    with open("config.txt", 'r') as seasons:
+        seasonList = seasons.read().splitlines()
+
+    for season in seasonList:
+        allSkaterStats = GetAllPlayerSituationStats(season)
+        allSkaterSeasonStats = SituationStatsToSeasonStats(allSkaterStats)
+        filePath = f"output/skaters_{season}.csv"
+        WriteStatsToCsvFile(allSkaterSeasonStats, filePath)
     
 
-def GetAllPlayerSituationStats():
-    allPlayersStats = {}
-    with open(sys.argv[1], 'r') as csv_file:
-        # Create a dictionary with the header row as the keys
+def GetAllPlayerSituationStats(season):
+    # make a get request to the specified URL
+    url = f"https://moneypuck.com/moneypuck/playerData/seasonSummary/{season}/regular/skaters.csv"
+    result = requests.get(url)
+    if result.status_code == 200:
+        # write the contents of the response (the data) to a file
+        if season != 2022:
+            csv_reader = csv.DictReader(result.iter_lines(decode_unicode=True))
+            # print first 5 rows of the csv reader
+            allPlayersStats = {}
+            for row in csv_reader:
+                skaterSeasonStats = SkaterSituationSeasonStats(
+                    row["playerId"],
+                    row["season"],
+                    row["name"],
+                    row["team"],
+                    row["position"],
+                    row["situation"],
+                    row["games_played"],
+                    row["icetime"],
+                    row["shifts"],
+                    row["gameScore"],
+                    row["onIce_corsiPercentage"],
+                    row["I_F_primaryAssists"],
+                    row["I_F_secondaryAssists"],
+                    row["I_F_shotsOnGoal"],
+                    row["I_F_missedShots"],
+                    row["I_F_shotAttempts"],
+                    row["I_F_goals"],
+                    row["I_F_rebounds"],
+                    row["I_F_reboundGoals"],
+                    row["I_F_hits"],
+                    row["I_F_takeaways"],
+                    row["I_F_giveaways"],
+                    row["I_F_lowDangerShots"],
+                    row["I_F_mediumDangerShots"],
+                    row["I_F_highDangerShots"],
+                    row["I_F_lowDangerGoals"],
+                    row["I_F_mediumDangerGoals"],
+                    row["I_F_highDangerGoals"],
+                    row["shotsBlockedByPlayer"]
+                )
+                if (allPlayersStats.get(skaterSeasonStats.playerId) == None):
+                    allPlayersStats[skaterSeasonStats.playerId] = {}
+                allPlayersStats[skaterSeasonStats.playerId][skaterSeasonStats.situation] = skaterSeasonStats
+            return allPlayersStats
+        
+    else:
+        print(f"Error: could not retrieve data from URL {url}.")
+        print(f"Status code: {result.status_code}")
 
-        csv_reader = csv.DictReader(csv_file)
-        for row in csv_reader:
-            skaterSeasonStats = SkaterSituationSeasonStats(
-                row["playerId"],
-                row["season"],
-                row["name"],
-                row["team"],
-                row["position"],
-                row["situation"],
-                row["games_played"],
-                row["icetime"],
-                row["shifts"],
-                row["gameScore"],
-                row["onIce_corsiPercentage"],
-                row["I_F_primaryAssists"],
-                row["I_F_secondaryAssists"],
-                row["I_F_shotsOnGoal"],
-                row["I_F_missedShots"],
-                row["I_F_shotAttempts"],
-                row["I_F_goals"],
-                row["I_F_rebounds"],
-                row["I_F_reboundGoals"],
-                row["I_F_hits"],
-                row["I_F_takeaways"],
-                row["I_F_giveaways"],
-                row["I_F_lowDangerShots"],
-                row["I_F_mediumDangerShots"],
-                row["I_F_highDangerShots"],
-                row["I_F_lowDangerGoals"],
-                row["I_F_mediumDangerGoals"],
-                row["I_F_highDangerGoals"],
-                row["shotsBlockedByPlayer"]
-            )
-            if (allPlayersStats.get(skaterSeasonStats.playerId) == None):
-                allPlayersStats[skaterSeasonStats.playerId] = {}
-            allPlayersStats[skaterSeasonStats.playerId][skaterSeasonStats.situation] = skaterSeasonStats
-    return allPlayersStats
+    return None
+
+
 
 def SituationStatsToSeasonStats(allSkaterStats):
     allSkaterSeasonStats = []
@@ -198,6 +212,14 @@ def WriteStatsToCsvFile(allSkaterSeasonStats, filePath):
                         "icetime",
                         "shifts",
                         "gameScore",
+                        "YF_Pts",
+                        "YF_Goal",
+                        "YF_Assist",
+                        "YF_Shot",
+                        "YF_Hit",
+                        "YF_Block",
+                        "YF_FiveOnFour",
+                        "YF_FourOnFive",
                         "onIce_corsiPercentage",
                         "I_F_primaryAssists",
                         "I_F_secondaryAssists",
@@ -219,14 +241,6 @@ def WriteStatsToCsvFile(allSkaterSeasonStats, filePath):
                         "shotsBlockedByPlayer",
                         "FiveOnFourPts",
                         "FourOnFivePts",
-                        "YF_Goal",
-                        "YF_Assist",
-                        "YF_Shot",
-                        "YF_Hit",
-                        "YF_Block",
-                        "YF_FiveOnFour",
-                        "YF_FourOnFive",
-                        "YF_Pts",
                         "FiveOnFourIcetime",
                         "FourOnFiveIcetime"]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
