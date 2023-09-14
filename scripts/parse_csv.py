@@ -140,46 +140,45 @@ def GetAllPlayerSituationStats(season):
     result = requests.get(url)
     if result.status_code == 200:
         # write the contents of the response (the data) to a file
-        if season != 2022:
-            csv_reader = csv.DictReader(result.iter_lines(decode_unicode=True))
-            # print first 5 rows of the csv reader
-            allPlayersStats = {}
-            for row in csv_reader:
-                skaterSeasonStats = SkaterSituationSeasonStats(
-                    row["playerId"],
-                    row["season"],
-                    row["name"],
-                    row["team"],
-                    row["position"],
-                    row["situation"],
-                    row["games_played"],
-                    row["icetime"],
-                    row["shifts"],
-                    row["gameScore"],
-                    row["onIce_corsiPercentage"],
-                    row["I_F_primaryAssists"],
-                    row["I_F_secondaryAssists"],
-                    row["I_F_shotsOnGoal"],
-                    row["I_F_missedShots"],
-                    row["I_F_shotAttempts"],
-                    row["I_F_goals"],
-                    row["I_F_rebounds"],
-                    row["I_F_reboundGoals"],
-                    row["I_F_hits"],
-                    row["I_F_takeaways"],
-                    row["I_F_giveaways"],
-                    row["I_F_lowDangerShots"],
-                    row["I_F_mediumDangerShots"],
-                    row["I_F_highDangerShots"],
-                    row["I_F_lowDangerGoals"],
-                    row["I_F_mediumDangerGoals"],
-                    row["I_F_highDangerGoals"],
-                    row["shotsBlockedByPlayer"]
-                )
-                if (allPlayersStats.get(skaterSeasonStats.playerId) == None):
-                    allPlayersStats[skaterSeasonStats.playerId] = {}
-                allPlayersStats[skaterSeasonStats.playerId][skaterSeasonStats.situation] = skaterSeasonStats
-            return allPlayersStats
+        csv_reader = csv.DictReader(result.iter_lines(decode_unicode=True))
+        # print first 5 rows of the csv reader
+        allPlayersStats = {}
+        for row in csv_reader:
+            skaterSeasonStats = SkaterSituationSeasonStats(
+                row["playerId"],
+                row["season"],
+                row["name"],
+                row["team"],
+                row["position"],
+                row["situation"],
+                row["games_played"],
+                row["icetime"],
+                row["shifts"],
+                row["gameScore"],
+                row["onIce_corsiPercentage"],
+                row["I_F_primaryAssists"],
+                row["I_F_secondaryAssists"],
+                row["I_F_shotsOnGoal"],
+                row["I_F_missedShots"],
+                row["I_F_shotAttempts"],
+                row["I_F_goals"],
+                row["I_F_rebounds"],
+                row["I_F_reboundGoals"],
+                row["I_F_hits"],
+                row["I_F_takeaways"],
+                row["I_F_giveaways"],
+                row["I_F_lowDangerShots"],
+                row["I_F_mediumDangerShots"],
+                row["I_F_highDangerShots"],
+                row["I_F_lowDangerGoals"],
+                row["I_F_mediumDangerGoals"],
+                row["I_F_highDangerGoals"],
+                row["shotsBlockedByPlayer"]
+            )
+            if (allPlayersStats.get(skaterSeasonStats.playerId) == None):
+                allPlayersStats[skaterSeasonStats.playerId] = {}
+            allPlayersStats[skaterSeasonStats.playerId][skaterSeasonStats.situation] = skaterSeasonStats
+        return allPlayersStats
         
     else:
         print(f"Error: could not retrieve data from URL {url}.")
