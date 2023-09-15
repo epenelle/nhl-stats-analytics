@@ -1,7 +1,7 @@
 # This script parses a csv file and prints the first 10 lines of the file to the console.
 # Usage: python parse_csv.py <csv_file>
-import sys
 import csv
+import os
 import requests
 from dotenv import load_dotenv
 
@@ -127,11 +127,14 @@ def main():
     with open("config.txt", 'r') as seasons:
         seasonList = seasons.read().splitlines()
 
+    allSeasonStatsFilePath = f"output/skaters_all.csv"
+    writeToAllSeason = os.path.exists(allSeasonStatsFilePath)
     for season in seasonList:
         allSkaterStats = GetAllPlayerSituationStats(season)
         allSkaterSeasonStats = SituationStatsToSeasonStats(allSkaterStats)
-        filePath = f"output/skaters_{season}.csv"
-        WriteStatsToCsvFile(allSkaterSeasonStats, filePath)
+        WriteStatsToCsvFile(allSkaterSeasonStats, season)
+        if(writeToAllSeason):
+            WriteToAllSeasonsStats(allSkaterSeasonStats)
     
 
 def GetAllPlayerSituationStats(season):
@@ -200,8 +203,15 @@ def SituationStatsToSeasonStats(allSkaterStats):
         allSkaterSeasonStats.append(skaterSeasonStats)
     return allSkaterSeasonStats
 
-def WriteStatsToCsvFile(allSkaterSeasonStats, filePath):
-    with open(filePath, 'w', newline='') as csv_file:
+def WriteStatsToCsvFile(allSkaterSeasonStats, season):
+    WriteToSingleSeasonStats(allSkaterSeasonStats, season)
+    WriteToAllSeasonsStats(allSkaterSeasonStats)
+
+def WriteToSingleSeasonStats(allSkaterSeasonStats, season):
+    singleSeasonStatsFilePath = f"output/skaters_{season}.csv"
+    if(os.path.exists(singleSeasonStatsFilePath)):
+        return
+    with open(singleSeasonStatsFilePath, 'w', newline='') as csv_file:
         fieldnames = ["playerId",
                         "name",
                         "season",
@@ -288,5 +298,95 @@ def WriteStatsToCsvFile(allSkaterSeasonStats, filePath):
                 "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime
             })
 
+def WriteToAllSeasonsStats(allSkaterSeasonStats):
+    # check if file exists
+    allSeasonStatsFilePath = f"output/skaters_all.csv"
+    
+    with open(allSeasonStatsFilePath, 'a', newline='') as csv_file:
+        fieldnames = ["playerId",
+                        "name",
+                        "season",
+                        "team",
+                        "position",
+                        "games_played",
+                        "icetime",
+                        "shifts",
+                        "gameScore",
+                        "YF_Pts",
+                        "YF_Goal",
+                        "YF_Assist",
+                        "YF_Shot",
+                        "YF_Hit",
+                        "YF_Block",
+                        "YF_FiveOnFour",
+                        "YF_FourOnFive",
+                        "onIce_corsiPercentage",
+                        "I_F_primaryAssists",
+                        "I_F_secondaryAssists",
+                        "I_F_shotsOnGoal",
+                        "I_F_missedShots",
+                        "I_F_shotAttempts",
+                        "I_F_goals",
+                        "I_F_rebounds",
+                        "I_F_reboundGoals",
+                        "I_F_hits",
+                        "I_F_takeaways",
+                        "I_F_giveaways",
+                        "I_F_lowDangerShots",
+                        "I_F_mediumDangerShots",
+                        "I_F_highDangerShots",
+                        "I_F_lowDangerGoals",
+                        "I_F_mediumDangerGoals",
+                        "I_F_highDangerGoals",
+                        "shotsBlockedByPlayer",
+                        "FiveOnFourPts",
+                        "FourOnFivePts",
+                        "FiveOnFourIcetime",
+                        "FourOnFiveIcetime"]
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for skaterSeasonStats in allSkaterSeasonStats:
+            writer.writerow({
+                "playerId": skaterSeasonStats.playerId,
+                "name": skaterSeasonStats.name,
+                "season": skaterSeasonStats.season,
+                "team": skaterSeasonStats.team,
+                "position": skaterSeasonStats.position,
+                "games_played": skaterSeasonStats.games_played,
+                "icetime": skaterSeasonStats.icetime,
+                "shifts": skaterSeasonStats.shifts,
+                "gameScore": skaterSeasonStats.gameScore,
+                "onIce_corsiPercentage": skaterSeasonStats.onIce_corsiPercentage,
+                "I_F_primaryAssists": skaterSeasonStats.I_F_primaryAssists,
+                "I_F_secondaryAssists": skaterSeasonStats.I_F_secondaryAssists,
+                "I_F_shotsOnGoal": skaterSeasonStats.I_F_shotsOnGoal,
+                "I_F_missedShots": skaterSeasonStats.I_F_missedShots,
+                "I_F_shotAttempts": skaterSeasonStats.I_F_shotAttempts,
+                "I_F_goals": skaterSeasonStats.I_F_goals,
+                "I_F_rebounds": skaterSeasonStats.I_F_rebounds,
+                "I_F_reboundGoals": skaterSeasonStats.I_F_reboundGoals,
+                "I_F_hits": skaterSeasonStats.I_F_hits,
+                "I_F_takeaways": skaterSeasonStats.I_F_takeaways,
+                "I_F_giveaways": skaterSeasonStats.I_F_giveaways,
+                "I_F_lowDangerShots": skaterSeasonStats.I_F_lowDangerShots,
+                "I_F_mediumDangerShots": skaterSeasonStats.I_F_mediumDangerShots,
+                "I_F_highDangerShots": skaterSeasonStats.I_F_highDangerShots,
+                "I_F_lowDangerGoals": skaterSeasonStats.I_F_lowDangerGoals,
+                "I_F_mediumDangerGoals": skaterSeasonStats.I_F_mediumDangerGoals,
+                "I_F_highDangerGoals": skaterSeasonStats.I_F_highDangerGoals,
+                "shotsBlockedByPlayer": skaterSeasonStats.shotsBlockedByPlayer,
+                "FiveOnFourPts": skaterSeasonStats.FiveOnFourPts,
+                "FourOnFivePts": skaterSeasonStats.FourOnFivePts,
+                "YF_Goal": skaterSeasonStats.YF_Goal,
+                "YF_Assist": skaterSeasonStats.YF_Assist,
+                "YF_Shot": skaterSeasonStats.YF_Shot,
+                "YF_Hit": skaterSeasonStats.YF_Hit,
+                "YF_Block": skaterSeasonStats.YF_Block,
+                "YF_FiveOnFour": skaterSeasonStats.YF_FiveOnFour,
+                "YF_FourOnFive": skaterSeasonStats.YF_FourOnFive,
+                "YF_Pts": skaterSeasonStats.YF_Pts,
+                "FiveOnFourIcetime": skaterSeasonStats.FiveOnFourIcetime,
+                "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime
+            })
 if __name__ == "__main__":
     main()
