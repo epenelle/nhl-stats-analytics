@@ -1,6 +1,7 @@
 venv/*
 datasets/*
 output/*
+ignore/*
 .env
 *.xlsx
 nhl-stats-analytics.code-workspace
