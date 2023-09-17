@@ -48,14 +48,15 @@ class SkaterSeasonStats:
         self.FourOnFivePts = (self.four_on_five.I_F_goals + self.four_on_five.I_F_primaryAssists + self.four_on_five.I_F_secondaryAssists)
         self.FourOnFiveIcetime = self.four_on_five.icetime
 
-        self.YF_Goal = 3 * self.I_F_goals
-        self.YF_Assist = 2 * (self.I_F_primaryAssists + self.I_F_secondaryAssists)
-        self.YF_Shot = round(0.4 * self.I_F_shotsOnGoal)
-        self.YF_Hit = round(0.4 * self.I_F_hits)
-        self.YF_Block = round(0.4 * self.shotsBlockedByPlayer)
-        self.YF_FiveOnFour = round(0.4 * (self.five_on_four.I_F_goals + self.five_on_four.I_F_primaryAssists + self.five_on_four.I_F_secondaryAssists))
-        self.YF_FourOnFive = round(0.4 * (self.four_on_five.I_F_goals + self.four_on_five.I_F_primaryAssists + self.four_on_five.I_F_secondaryAssists))
+        self.YF_Goal = float(os.environ['YF_GOALS_PTS']) * self.I_F_goals
+        self.YF_Assist = float(os.environ['YF_ASSISTS_PTS']) * (self.I_F_primaryAssists + self.I_F_secondaryAssists)
+        self.YF_Shot = round(float(os.environ['YF_SHOT_PTS']) * self.I_F_shotsOnGoal)
+        self.YF_Hit = round(float(os.environ['YF_HIT_PTS']) * self.I_F_hits)
+        self.YF_Block = round(float(os.environ['YF_BLOCK_PTS']) * self.shotsBlockedByPlayer)
+        self.YF_FiveOnFour = round(float(os.environ['YF_FIVEONFOUR_PTS']) * (self.five_on_four.I_F_goals + self.five_on_four.I_F_primaryAssists + self.five_on_four.I_F_secondaryAssists))
+        self.YF_FourOnFive = round(float(os.environ['YF_FOURONFIVE_PTS']) * (self.four_on_five.I_F_goals + self.four_on_five.I_F_primaryAssists + self.four_on_five.I_F_secondaryAssists))
         self.YF_Pts = self.YF_Goal + self.YF_Assist + self.YF_Shot + self.YF_Hit + self.YF_Block + self.YF_FiveOnFour + self.YF_FourOnFive
+        self.YF_PtsPer60 = self.YF_Pts * 60 / (self.icetime/60) #ice time = seconds, convert to minutes
 
 
 # class SkaterSituationSeasonStats:
@@ -120,32 +121,13 @@ class SkaterSituationSeasonStats:
         self.I_F_highDangerGoals = float(I_F_highDangerGoals)
         self.shotsBlockedByPlayer = float(shotsBlockedByPlayer)
 
-def main():
-    load_dotenv()
-
-    # read all lines from config.txt into a list
-    with open("config.txt", 'r') as seasons:
-        seasonList = seasons.read().splitlines()
-
-    allSeasonStatsFilePath = f"output/skaters_all.csv"
-    writeToAllSeason = os.path.exists(allSeasonStatsFilePath)
-    for season in seasonList:
-        allSkaterStats = GetAllPlayerSituationStats(season)
-        allSkaterSeasonStats = SituationStatsToSeasonStats(allSkaterStats)
-        WriteStatsToCsvFile(allSkaterSeasonStats, season)
-        if(writeToAllSeason):
-            WriteToAllSeasonsStats(allSkaterSeasonStats)
-    
-
-def GetAllPlayerSituationStats(season):
+def GetAllPlayerSituationStats(allSkaterStats, season):
     # make a get request to the specified URL
     url = f"https://moneypuck.com/moneypuck/playerData/seasonSummary/{season}/regular/skaters.csv"
     result = requests.get(url)
     if result.status_code == 200:
         # write the contents of the response (the data) to a file
         csv_reader = csv.DictReader(result.iter_lines(decode_unicode=True))
-        # print first 5 rows of the csv reader
-        allPlayersStats = {}
         for row in csv_reader:
             skaterSeasonStats = SkaterSituationSeasonStats(
                 row["playerId"],
@@ -178,30 +160,46 @@ def GetAllPlayerSituationStats(season):
                 row["I_F_highDangerGoals"],
                 row["shotsBlockedByPlayer"]
             )
-            if (allPlayersStats.get(skaterSeasonStats.playerId) == None):
-                allPlayersStats[skaterSeasonStats.playerId] = {}
-            allPlayersStats[skaterSeasonStats.playerId][skaterSeasonStats.situation] = skaterSeasonStats
-        return allPlayersStats
-        
+            # Check if player exists in dictionary
+            if (allSkaterStats.get(skaterSeasonStats.playerId) == None):
+                allSkaterStats[skaterSeasonStats.playerId] = {}
+
+            # Check if season exists in dictionary
+            if (allSkaterStats[skaterSeasonStats.playerId].get(season) == None):
+                allSkaterStats[skaterSeasonStats.playerId][season] = {}
+
+            allSkaterStats[skaterSeasonStats.playerId][season][skaterSeasonStats.situation] = skaterSeasonStats
+
     else:
         print(f"Error: could not retrieve data from URL {url}.")
         print(f"Status code: {result.status_code}")
 
-    return None
+    return 
 
 
 
-def SituationStatsToSeasonStats(allSkaterStats):
-    allSkaterSeasonStats = []
+def SituationStatsToSeasonStats(allSkaterStats, allSkaterSeasonStats, season):
     for playerId in allSkaterStats:
-        skaterSituationsStats = allSkaterStats[playerId]
+        if (allSkaterStats[playerId].get(season) == None):
+            # print(f"Player {playerId} does not have stats for season {season}")
+            continue
+        skaterSituationsStats = allSkaterStats[playerId][season]
         skaterSeasonStats = SkaterSeasonStats(all=skaterSituationsStats["all"],
                                                 fiveOnfive=skaterSituationsStats["5on5"],
                                                 fiveOnFour=skaterSituationsStats["5on4"],
                                                 fourOnfive=skaterSituationsStats["4on5"],
                                                 other=skaterSituationsStats["other"])
-        allSkaterSeasonStats.append(skaterSeasonStats)
-    return allSkaterSeasonStats
+        
+        # Check if player exists in dictionary
+        if (allSkaterSeasonStats.get(playerId) == None):
+            allSkaterSeasonStats[playerId] = {}
+
+        # Check if season exists in dictionary
+        if (allSkaterSeasonStats[playerId].get(season) == None):
+            allSkaterSeasonStats[playerId][season] = {}
+
+        allSkaterSeasonStats[playerId][season] = skaterSeasonStats
+    return
 
 def WriteStatsToCsvFile(allSkaterSeasonStats, season):
     WriteToSingleSeasonStats(allSkaterSeasonStats, season)
@@ -222,6 +220,7 @@ def WriteToSingleSeasonStats(allSkaterSeasonStats, season):
                         "shifts",
                         "gameScore",
                         "YF_Pts",
+                        "YF_PtsPer60",
                         "YF_Goal",
                         "YF_Assist",
                         "YF_Shot",
@@ -251,10 +250,15 @@ def WriteToSingleSeasonStats(allSkaterSeasonStats, season):
                         "FiveOnFourPts",
                         "FourOnFivePts",
                         "FiveOnFourIcetime",
-                        "FourOnFiveIcetime"]
+                        "FourOnFiveIcetime",
+                        "YF_PtsPer60"]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
-        for skaterSeasonStats in allSkaterSeasonStats:
+        for playerId in allSkaterSeasonStats:
+            if (allSkaterSeasonStats[playerId].get(season) == None):
+                # print(f"Player {playerId} does not have stats for season {season}")
+                continue
+            skaterSeasonStats = allSkaterSeasonStats[playerId][season]
             writer.writerow({
                 "playerId": skaterSeasonStats.playerId,
                 "name": skaterSeasonStats.name,
@@ -295,7 +299,8 @@ def WriteToSingleSeasonStats(allSkaterSeasonStats, season):
                 "YF_FourOnFive": skaterSeasonStats.YF_FourOnFive,
                 "YF_Pts": skaterSeasonStats.YF_Pts,
                 "FiveOnFourIcetime": skaterSeasonStats.FiveOnFourIcetime,
-                "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime
+                "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime,
+                "YF_PtsPer60": skaterSeasonStats.YF_PtsPer60
             })
 
 def WriteToAllSeasonsStats(allSkaterSeasonStats):
@@ -313,6 +318,7 @@ def WriteToAllSeasonsStats(allSkaterSeasonStats):
                         "shifts",
                         "gameScore",
                         "YF_Pts",
+                        "YF_PtsPer60",
                         "YF_Goal",
                         "YF_Assist",
                         "YF_Shot",
@@ -345,48 +351,78 @@ def WriteToAllSeasonsStats(allSkaterSeasonStats):
                         "FourOnFiveIcetime"]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
-        for skaterSeasonStats in allSkaterSeasonStats:
-            writer.writerow({
-                "playerId": skaterSeasonStats.playerId,
-                "name": skaterSeasonStats.name,
-                "season": skaterSeasonStats.season,
-                "team": skaterSeasonStats.team,
-                "position": skaterSeasonStats.position,
-                "games_played": skaterSeasonStats.games_played,
-                "icetime": skaterSeasonStats.icetime,
-                "shifts": skaterSeasonStats.shifts,
-                "gameScore": skaterSeasonStats.gameScore,
-                "onIce_corsiPercentage": skaterSeasonStats.onIce_corsiPercentage,
-                "I_F_primaryAssists": skaterSeasonStats.I_F_primaryAssists,
-                "I_F_secondaryAssists": skaterSeasonStats.I_F_secondaryAssists,
-                "I_F_shotsOnGoal": skaterSeasonStats.I_F_shotsOnGoal,
-                "I_F_missedShots": skaterSeasonStats.I_F_missedShots,
-                "I_F_shotAttempts": skaterSeasonStats.I_F_shotAttempts,
-                "I_F_goals": skaterSeasonStats.I_F_goals,
-                "I_F_rebounds": skaterSeasonStats.I_F_rebounds,
-                "I_F_reboundGoals": skaterSeasonStats.I_F_reboundGoals,
-                "I_F_hits": skaterSeasonStats.I_F_hits,
-                "I_F_takeaways": skaterSeasonStats.I_F_takeaways,
-                "I_F_giveaways": skaterSeasonStats.I_F_giveaways,
-                "I_F_lowDangerShots": skaterSeasonStats.I_F_lowDangerShots,
-                "I_F_mediumDangerShots": skaterSeasonStats.I_F_mediumDangerShots,
-                "I_F_highDangerShots": skaterSeasonStats.I_F_highDangerShots,
-                "I_F_lowDangerGoals": skaterSeasonStats.I_F_lowDangerGoals,
-                "I_F_mediumDangerGoals": skaterSeasonStats.I_F_mediumDangerGoals,
-                "I_F_highDangerGoals": skaterSeasonStats.I_F_highDangerGoals,
-                "shotsBlockedByPlayer": skaterSeasonStats.shotsBlockedByPlayer,
-                "FiveOnFourPts": skaterSeasonStats.FiveOnFourPts,
-                "FourOnFivePts": skaterSeasonStats.FourOnFivePts,
-                "YF_Goal": skaterSeasonStats.YF_Goal,
-                "YF_Assist": skaterSeasonStats.YF_Assist,
-                "YF_Shot": skaterSeasonStats.YF_Shot,
-                "YF_Hit": skaterSeasonStats.YF_Hit,
-                "YF_Block": skaterSeasonStats.YF_Block,
-                "YF_FiveOnFour": skaterSeasonStats.YF_FiveOnFour,
-                "YF_FourOnFive": skaterSeasonStats.YF_FourOnFive,
-                "YF_Pts": skaterSeasonStats.YF_Pts,
-                "FiveOnFourIcetime": skaterSeasonStats.FiveOnFourIcetime,
-                "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime
-            })
+        for playerId in allSkaterSeasonStats:
+            for season in allSkaterSeasonStats[playerId]:
+                skaterSeasonStats = allSkaterSeasonStats[playerId][season]
+
+                writer.writerow({
+                    "playerId": skaterSeasonStats.playerId,
+                    "name": skaterSeasonStats.name,
+                    "season": skaterSeasonStats.season,
+                    "team": skaterSeasonStats.team,
+                    "position": skaterSeasonStats.position,
+                    "games_played": skaterSeasonStats.games_played,
+                    "icetime": skaterSeasonStats.icetime,
+                    "shifts": skaterSeasonStats.shifts,
+                    "gameScore": skaterSeasonStats.gameScore,
+                    "onIce_corsiPercentage": skaterSeasonStats.onIce_corsiPercentage,
+                    "I_F_primaryAssists": skaterSeasonStats.I_F_primaryAssists,
+                    "I_F_secondaryAssists": skaterSeasonStats.I_F_secondaryAssists,
+                    "I_F_shotsOnGoal": skaterSeasonStats.I_F_shotsOnGoal,
+                    "I_F_missedShots": skaterSeasonStats.I_F_missedShots,
+                    "I_F_shotAttempts": skaterSeasonStats.I_F_shotAttempts,
+                    "I_F_goals": skaterSeasonStats.I_F_goals,
+                    "I_F_rebounds": skaterSeasonStats.I_F_rebounds,
+                    "I_F_reboundGoals": skaterSeasonStats.I_F_reboundGoals,
+                    "I_F_hits": skaterSeasonStats.I_F_hits,
+                    "I_F_takeaways": skaterSeasonStats.I_F_takeaways,
+                    "I_F_giveaways": skaterSeasonStats.I_F_giveaways,
+                    "I_F_lowDangerShots": skaterSeasonStats.I_F_lowDangerShots,
+                    "I_F_mediumDangerShots": skaterSeasonStats.I_F_mediumDangerShots,
+                    "I_F_highDangerShots": skaterSeasonStats.I_F_highDangerShots,
+                    "I_F_lowDangerGoals": skaterSeasonStats.I_F_lowDangerGoals,
+                    "I_F_mediumDangerGoals": skaterSeasonStats.I_F_mediumDangerGoals,
+                    "I_F_highDangerGoals": skaterSeasonStats.I_F_highDangerGoals,
+                    "shotsBlockedByPlayer": skaterSeasonStats.shotsBlockedByPlayer,
+                    "FiveOnFourPts": skaterSeasonStats.FiveOnFourPts,
+                    "FourOnFivePts": skaterSeasonStats.FourOnFivePts,
+                    "YF_Goal": skaterSeasonStats.YF_Goal,
+                    "YF_Assist": skaterSeasonStats.YF_Assist,
+                    "YF_Shot": skaterSeasonStats.YF_Shot,
+                    "YF_Hit": skaterSeasonStats.YF_Hit,
+                    "YF_Block": skaterSeasonStats.YF_Block,
+                    "YF_FiveOnFour": skaterSeasonStats.YF_FiveOnFour,
+                    "YF_FourOnFive": skaterSeasonStats.YF_FourOnFive,
+                    "YF_Pts": skaterSeasonStats.YF_Pts,
+                    "FiveOnFourIcetime": skaterSeasonStats.FiveOnFourIcetime,
+                    "FourOnFiveIcetime": skaterSeasonStats.FourOnFiveIcetime,
+                    "YF_PtsPer60": skaterSeasonStats.YF_PtsPer60
+                })
+
+def WriteDataToCsvFiles(seasonList, allSkaterSeasonStats):
+    allSeasonStatsFilePath = f"output/skaters_all.csv"
+    writeToAllSeason = not os.path.exists(allSeasonStatsFilePath)
+    for season in seasonList:
+        WriteToSingleSeasonStats(allSkaterSeasonStats, season)
+
+    if(writeToAllSeason):
+        WriteToAllSeasonsStats(allSkaterSeasonStats)
+
+
+def main():
+    load_dotenv()
+
+    # read all lines from config.txt into a list
+    with open("config.txt", 'r') as seasons:
+        seasonList = seasons.read().splitlines()
+
+    allSkaterStats = {}
+    allSkaterSeasonStats = {}
+    for season in seasonList:
+        GetAllPlayerSituationStats(allSkaterStats, season)
+        SituationStatsToSeasonStats(allSkaterStats, allSkaterSeasonStats, season)
+
+    WriteDataToCsvFiles(seasonList, allSkaterSeasonStats)
+
 if __name__ == "__main__":
     main()
