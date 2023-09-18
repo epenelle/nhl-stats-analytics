@@ -5,7 +5,6 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# class SkaterSeasonStats:
 class SkaterSeasonStats:
     def __init__(self, all, fiveOnfive, fiveOnFour, fourOnfive, other):
         self.all = all
@@ -57,6 +56,55 @@ class SkaterSeasonStats:
         self.YF_FourOnFive = round(float(os.environ['YF_FOURONFIVE_PTS']) * (self.four_on_five.I_F_goals + self.four_on_five.I_F_primaryAssists + self.four_on_five.I_F_secondaryAssists))
         self.YF_Pts = self.YF_Goal + self.YF_Assist + self.YF_Shot + self.YF_Hit + self.YF_Block + self.YF_FiveOnFour + self.YF_FourOnFive
         self.YF_PtsPer60 = self.YF_Pts * 60 / (self.icetime/60) #ice time = seconds, convert to minutes
+
+class SkaterSeasonStatsPrediction:
+    playerId = None
+    season = 2023
+    name = None
+    team = None
+    position = None
+    games_played = None
+    icetime = None
+    shifts = None
+    gameScore = None
+    onIce_corsiPercentage = None
+    I_F_primaryAssists = None
+    I_F_secondaryAssists = None
+    I_F_shotsOnGoal = None
+    I_F_missedShots = None
+    I_F_shotAttempts = None
+    I_F_goals = None
+    I_F_rebounds = None
+    I_F_reboundGoals = None
+    I_F_hits = None
+    I_F_takeaways = None
+    I_F_giveaways = None
+    I_F_lowDangerShots = None
+    I_F_mediumDangerShots = None
+    I_F_highDangerShots = None
+    I_F_lowDangerGoals = None
+    I_F_mediumDangerGoals = None
+    I_F_highDangerGoals = None
+    shotsBlockedByPlayer = None
+    FiveOnFourPts = None
+    FiveOnFourIcetime = None
+    FourOnFivePts = None
+    FourOnFiveIcetime = None
+    YF_Goal = None
+    YF_Assist = None
+    YF_Shot = None
+    YF_Hit = None
+    YF_Block = None
+    YF_FiveOnFour = None
+    YF_FourOnFive = None
+    YF_Pts = None
+    YF_PtsPer60 = None
+        
+    def __init__(self, skaterSeasonStats: SkaterSeasonStats=None):
+        self.playerId = skaterSeasonStats.playerId
+        self.name = skaterSeasonStats.name
+        self.team = skaterSeasonStats.team
+        self.position = skaterSeasonStats.position
 
 
 # class SkaterSituationSeasonStats:
@@ -408,6 +456,111 @@ def WriteDataToCsvFiles(seasonList, allSkaterSeasonStats):
     if(writeToAllSeason):
         WriteToAllSeasonsStats(allSkaterSeasonStats)
 
+def Predict(allSkaterSeasonStats):
+    for playerId in allSkaterSeasonStats:
+        skaterAllSeasonsStats = allSkaterSeasonStats[playerId]
+        skater2023SeasonStats = PredictBasedOnWeights(skaterAllSeasonsStats)
+        if skater2023SeasonStats is not None:
+            skaterAllSeasonsStats["2023"] = skater2023SeasonStats
+            
+
+        
+
+def PredictBasedOnWeights(skaterAllSeasonsStats):
+    weightsDict = GetWeightsSeasonDict(skaterAllSeasonsStats)
+    skater2023SeasonStats = None
+    if skaterAllSeasonsStats.get("2022") is not None:
+        skater2023SeasonStats = SkaterSeasonStatsPrediction(skaterAllSeasonsStats["2022"])
+    elif skaterAllSeasonsStats.get("2021") is not None:
+        skater2023SeasonStats = SkaterSeasonStatsPrediction(skaterAllSeasonsStats["2021"])
+    elif skaterAllSeasonsStats.get("2020") is not None:
+        skater2023SeasonStats = SkaterSeasonStatsPrediction(skaterAllSeasonsStats["2020"])
+    else:
+        return None
+    statKeys = ["games_played", 
+                "icetime",
+                "shifts",
+                "gameScore",
+                "onIce_corsiPercentage",
+                "I_F_primaryAssists",
+                "I_F_secondaryAssists",
+                "I_F_shotsOnGoal",
+                "I_F_missedShots",
+                "I_F_shotAttempts",
+                "I_F_goals",
+                "I_F_rebounds",
+                "I_F_reboundGoals",
+                "I_F_hits",
+                "I_F_takeaways",
+                "I_F_giveaways",
+                "I_F_lowDangerShots",
+                "I_F_mediumDangerShots",
+                "I_F_highDangerShots",
+                "I_F_lowDangerGoals",
+                "I_F_mediumDangerGoals",
+                "I_F_highDangerGoals",
+                "shotsBlockedByPlayer",
+                "FiveOnFourPts",
+                "FiveOnFourIcetime",
+                "FourOnFivePts",
+                "FourOnFiveIcetime",
+                "YF_Goal",
+                "YF_Assist",
+                "YF_Shot",
+                "YF_Hit",
+                "YF_Block",
+                "YF_FiveOnFour",
+                "YF_FourOnFive",
+                "YF_Pts",
+                "YF_PtsPer60"]
+
+    for statKey in statKeys:
+        prediction = PredictStatBasedOnWeights(skaterAllSeasonsStats, statKey, weightsDict)
+        setattr(skater2023SeasonStats, statKey, prediction)
+    
+    return skater2023SeasonStats
+    
+
+def PredictStatBasedOnWeights(skaterAllSeasonsStats, statKey, weightsDict):
+    prediction = 0
+    for weightKvp in weightsDict:
+        season = weightKvp["season"]
+        weight = weightKvp["weight"]
+        prediction += getattr(skaterAllSeasonsStats[season], statKey) * weight
+    return prediction
+
+
+def GetWeightsSeasonDict(skaterAllSeasonStats):
+    # HasPlayed returns true if the player have played at least 20 games during the season
+    def HasPlayed(skaterAllSeasonStats, season):
+        return skaterAllSeasonStats.get(season) is not None and int(skaterAllSeasonStats[season].games_played) >= 20
+
+    weightsPerSeason = []
+    # Edge cases
+    # Missed last 2 seasons
+    if(not HasPlayed(skaterAllSeasonStats, "2021") and not HasPlayed(skaterAllSeasonStats, "2022")):
+        return weightsPerSeason
+    
+    # Missed last season (may be retired)
+    if (not HasPlayed(skaterAllSeasonStats, "2022")):
+        weightsPerSeason.append({"season":"2021", "weight":1})
+
+    # Rookie
+    elif(not HasPlayed(skaterAllSeasonStats, "2021") ):
+        weightsPerSeason.append({"season":"2022", "weight":1.2})
+
+    else:
+        if(not HasPlayed(skaterAllSeasonStats, "2020")):
+            weightsPerSeason.append({"season":"2021", "weight":0.3})
+            weightsPerSeason.append({"season":"2022", "weight":0.7})
+        else:
+            weightsPerSeason.append({"season":"2020", "weight":0.10})
+            weightsPerSeason.append({"season":"2021", "weight":0.25})
+            weightsPerSeason.append({"season":"2022", "weight":0.65})
+    return weightsPerSeason
+        
+
+
 
 def main():
     load_dotenv()
@@ -421,6 +574,8 @@ def main():
     for season in seasonList:
         GetAllPlayerSituationStats(allSkaterStats, season)
         SituationStatsToSeasonStats(allSkaterStats, allSkaterSeasonStats, season)
+        
+    Predict(allSkaterSeasonStats)
 
     WriteDataToCsvFiles(seasonList, allSkaterSeasonStats)
 
